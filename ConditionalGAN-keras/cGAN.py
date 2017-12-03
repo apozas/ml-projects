@@ -169,7 +169,7 @@ for i in range(label_dim):
     for j in range(5):
         im = generator.predict([np.random.uniform(-1, 1, (1, noise_dim)),
 	                            to_categorical(i, label_dim)])[0].reshape((28, 28))
-        plt.subplot(5, label_dim, 5*j+i+1)
+        plt.subplot(5, label_dim, 10*j+i+1)
         plt.axis('off')
         plt.imshow(im, cmap='Greys_r')
 plt.savefig('cGAN_predictions.png')
