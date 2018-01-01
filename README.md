@@ -12,4 +12,4 @@ Conditional [Generative Adversarial Networks](https://arxiv.org/abs/1406.2661) w
 Collection of different energy-based generative models
 ([Restricted Boltzmann Machines](http://stanford.edu/~jlmcc/papers/PDP/Volume%201/Chap6_PDP86.pdf)
 and [Deep Belief Networks](http://www.scholarpedia.org/article/Deep_belief_networks)), for modelling
-both discrete and continuous data, written in [pytorch](http://www.pytorch.org)
+both discrete and continuous data, written in [pytorch](http://www.pytorch.org).
