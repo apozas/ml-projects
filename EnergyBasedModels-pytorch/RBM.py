@@ -1,7 +1,10 @@
 # Restricted Boltzmann Machine trained by Stochastic Gradient Descent
 #
 # Author: Alejandro Pozas-Kerstjens
-# Requires: tqdm for progress bar
+# Requires: numpy for numerics
+#           pytorch as ML framework
+#           matplotlib for plots
+#           tqdm for progress bar
 #           imageio for output export
 # Last modified: Jan, 2018
 
@@ -57,8 +60,8 @@ class RBM(nn.Module):
         wx_b       = F.linear(v, self.W, self.hbias)
 
         # Now we should do log(exp(wx_b) + 1). Instead, for numerical stability, we do the
-		# log-sum-exp trick, namely for large values of wx_b we do a + log(exp(wx_b - a) + exp(-a)),
-		# where a = max(0, wx_b).
+	# log-sum-exp trick, namely for large values of wx_b we do a + log(exp(wx_b - a) + exp(-a)),
+	# where a = max(0, wx_b).
         zr = Variable(torch.zeros(wx_b.size()))
         if self.cuda_state:
             zr = zr.cuda()
@@ -138,14 +141,14 @@ def test_rbm(hidd=200, learning_rates=[1e-3] * 10, k=2, batch_size=30, cuda_stat
     train_loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=True)
 
     # According to Hinton this should be fine, but some biases diverge in the case of MNIST.
-	# Actually, this initialization is the inverse of the sigmoid. This is, it is the inverse of 
-	# p = sigm(vbias), so it can be expected that during training the weights are close to zero and
+    # Actually, this initialization is the inverse of the sigmoid. This is, it is the inverse of 
+    # p = sigm(vbias), so it can be expected that during training the weights are close to zero and
     # change little
     vbias = nn.Parameter(torch.log(data.mean(0) / (1 - data.mean(0))).clamp(-20, 20))
 	
     # ------------------------------------------------------------------------------
-	# Construct RBM
-	# ------------------------------------------------------------------------------
+    # Construct RBM
+    # ------------------------------------------------------------------------------
     pre_trained = os.path.isfile('RBM.h5')
     rbm         = RBM(n_visible=vis, n_hidden=hidd, k=k, cuda_state=cuda_state, vbias=vbias)
     if pre_trained:
@@ -154,8 +157,8 @@ def test_rbm(hidd=200, learning_rates=[1e-3] * 10, k=2, batch_size=30, cuda_stat
     if cuda_state:
         rbm=rbm.cuda()
     # ------------------------------------------------------------------------------
-	# Training
-	# ------------------------------------------------------------------------------
+    # Training
+    # ------------------------------------------------------------------------------
     if not pre_trained:
         validation = Variable(data)[:10000]
         test       = Variable(test)
@@ -165,17 +168,17 @@ def test_rbm(hidd=200, learning_rates=[1e-3] * 10, k=2, batch_size=30, cuda_stat
         for epoch, learning_rate in enumerate(learning_rates):
             train_op   = optim.SGD(rbm.parameters(), lr=learning_rate)
             rbm.train(train_loader, train_op, epoch)
-			# A good measure of well-fitting is the free energy difference between some known and
-			# unknown instances. It is related to the log-likelihood difference, but it does not
-			# depend on the partition function. It should be around 0, and if it grows, it might be
-			# overfitting to the training data
+	    # A good measure of well-fitting is the free energy difference between some known and
+	    # unknown instances. It is related to the log-likelihood difference, but it does not
+	    # depend on the partition function. It should be around 0, and if it grows, it might be
+	    # overfitting to the training data
             gap = rbm.free_energy(validation) - rbm.free_energy(test)
             print('Gap = ' + str(gap.data[0]))
         torch.save(rbm.state_dict(), 'RBM.h5')
     
     # ------------------------------------------------------------------------------
-	# Plotting
-	# ------------------------------------------------------------------------------
+    # Plotting
+    # ------------------------------------------------------------------------------
     print('Reconstructing images')
     plt.figure(figsize=(20, 10))
     zero = Variable(torch.zeros(25, 784))
