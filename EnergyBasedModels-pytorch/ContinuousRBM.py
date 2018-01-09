@@ -7,6 +7,7 @@
 #           tqdm for progress bar
 #           imageio for output export
 # Last modified: Jan, 2018
+
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
