@@ -6,7 +6,7 @@ Implementation of different generative models based on energy-based learning. Ex
 with the MNIST dataset.
 
 Libraries required:
-- [pytorch](http://www.pytorch.org) as DL framework
+- [pytorch](http://www.pytorch.org) as ML framework
 - [numpy](http://www.numpy.org/) for math operations
 - [matplotlib](https://matplotlib.org/) for image visualization
 - [tqdm](https://pypi.python.org/pypi/tqdm) for custom progress bar
@@ -25,6 +25,7 @@ Restricted Boltzmann Machine with binary hidden but continuous visible units.
 ![CRBM](./crbm_sample.gif)
 
 ## 3. To-Do list
+- [ ] Implement [Persistent Contrastive Divergence](http://www.cs.toronto.edu/~tijmen/pcd/pcd.pdf) for training
 - [ ] [Deep Belief Network](http://www.scholarpedia.org/article/Deep_belief_networks) with binary
 visible units
 - [ ] Deep Belief Network with continuous visible units 
