@@ -14,14 +14,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from copy import deepcopy
 from RBM import RBM
 from torch.autograd import Variable
 from torchvision import datasets
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
@@ -31,24 +28,24 @@ def outer_product(vecs1, vecs2):
        :type vecs1: list of torch.Tensor or torch.autograd.Variable
        :param vecs2: b 1-D tensors of length n
        :type vecs2: list of torch.Tensor or torch.autograd.Variable
-       
+
        :returns: torch.Tensor or torch.autograd.Variable of size (m, n)
        '''
     return torch.bmm(vecs1.unsqueeze(2), vecs2.unsqueeze(1))
 
 
 class DBN(object):
-    def __init__(self, n_visible=6, hidden_layer_sizes=[3, 3], \
+
+    def __init__(self, n_visible=6, hidden_layer_sizes=[3, 3],
                  k=5, use_gpu=True):
-        
-        self.k       = k
+
+        self.k = k
         self.use_gpu = use_gpu
 
         self.rbm_layers = []
-        self.n_layers   = len(hidden_layer_sizes)
-        
-        assert self.n_layers > 0
+        self.n_layers = len(hidden_layer_sizes)
 
+        assert self.n_layers > 0
 
         # Construct DBN out of RBMs
         for i in range(self.n_layers):
@@ -67,8 +64,6 @@ class DBN(object):
         # Copy the RBMs (in particular, the parameters), so we have one copy
         # for inference and another for generation. Needed for fine-tuning
         self.inference_layers = deepcopy(self.rbm_layers)
-            
-
 
     def pretrain(self, input, lr=0.1, epochs=100, batch_size=10, test=None):
         # Pre-train the DBN as individual RBMs
@@ -82,14 +77,14 @@ class DBN(object):
                 layer_input = Variable(layer_input)
                 if self.use_gpu:
                     layer_input = layer_input.cuda()
-                _, sample   = (self.rbm_layers[i-1]
-                                   .sample_h_given_v(layer_input))
+                _, sample = (self.rbm_layers[i-1]
+                             .sample_h_given_v(layer_input))
                 layer_input = sample.data
                 if test is not None:
                     _, test = self.rbm_layers[i-1].sample_h_given_v(test)
-            
-            rbm          = self.rbm_layers[i]
-            optimizer    = optim.SGD(rbm.parameters(), lr=lr)
+
+            rbm = self.rbm_layers[i]
+            optimizer = optim.SGD(rbm.parameters(), lr=lr)
             layer_loader = torch.utils.data.DataLoader(layer_input,
                                                        batch_size=batch_size,
                                                        shuffle=True)
@@ -103,10 +98,9 @@ class DBN(object):
                     validation = Variable(layer_input)[:10000]
                     if self.use_gpu:
                         validation = validation.cuda()
-                        test   = test.cuda()
+                        test = test.cuda()
                     gap = rbm.free_energy(validation) - rbm.free_energy(test)
                     print('Gap: ' + str(gap.data[0]))
-                
 
     def finetune(self, input, lr=0.1, epochs=100, batch_size=10, k=None):
         '''This is done according to the up-down method developed in
@@ -121,14 +115,14 @@ class DBN(object):
         input_loader = torch.utils.data.DataLoader(input,
                                                    batch_size=batch_size,
                                                    shuffle=True)
-        top_RBM      = self.rbm_layers[-1]
+        top_RBM = self.rbm_layers[-1]
         for epoch in range(epochs):
             for iter, batch in enumerate(tqdm(input_loader,
                                               desc='Epoch ' + str(epoch + 1))):
                 sample_data = Variable(batch).float()
                 if self.use_gpu:
                     sample_data = sample_data.cuda()
-        
+
                 # Perform a bottom-up pass to get wake positive phase
                 # probabilities and samples, using the inference parameters.
                 # We begin with the train data as samples of the visible layer
@@ -173,59 +167,57 @@ class DBN(object):
                 # Note we use probabilities instead of samples, as appears in
                 # the original algorithm
                 sleepneg_means = [None]  # For having even indices. Unimportant
-                wakeneg_means  = []
+                wakeneg_means = []
                 for i in range(self.n_layers - 1):
                     sleepneg_mean, _ = (
-                                     self.inference_layers[i]               
-                                         .sample_h_given_v(sleeppos_samples[i])
-                                        )
+                        self.inference_layers[i]
+                        .sample_h_given_v(sleeppos_samples[i])
+                    )
                     sleepneg_means.append(sleepneg_mean)
-                
+
                     wakeneg_mean, _ = (
-                                    self.rbm_layers[i]                       
-                                        .sample_v_given_h(wakepos_samples[i+1])
-                                      )
+                        self.rbm_layers[i]
+                        .sample_v_given_h(wakepos_samples[i+1])
+                    )
                     wakeneg_means.append(wakeneg_mean)
                 # Updates to generative parameters. The last layer still acts
                 # as a standard RBM and we update it separately
                 for i, rbm in enumerate(self.rbm_layers[:-1]):
                     wakediff_i = wakepos_samples[i] - wakeneg_means[i]
-                    deltaW     = outer_product(wakepos_samples[i+1],
-                                               wakediff_i).data.mean(0)
-                    deltav     = wakediff_i.data.mean(0)
-                    rbm.W.data     += lr * deltaW
+                    deltaW = outer_product(wakepos_samples[i+1],
+                                           wakediff_i).data.mean(0)
+                    deltav = wakediff_i.data.mean(0)
+                    rbm.W.data += lr * deltaW
                     rbm.vbias.data += lr * deltav
                 # Updates to top RBM parameters
                 deltaW = (pos_W_topRBM - neg_W_topRBM)
                 deltav = (wakepos_samples[-2] - sleeppos_samples[-2])
                 deltah = (wakepos_samples[-1] - sleeppos_samples[-1])
-                top_RBM.W.data     += lr * deltaW.data.mean(0)
+                top_RBM.W.data += lr * deltaW.data.mean(0)
                 top_RBM.vbias.data += lr * deltav.data.mean(0)
                 top_RBM.hbias.data += lr * deltah.data.mean(0)
                 # Updates to inference parameters
                 for i, rbm in enumerate(self.inference_layers[:-1]):
                     sleepdiff_i = sleeppos_samples[i+1] - sleepneg_means[i+1]
-                    deltaW      = outer_product(sleeppos_samples[i],
-                                                sleepdiff_i).data.mean(0)
-                    deltah      = sleepdiff_i.data.mean(0)
-                    rbm.W.data     += lr * deltaW
+                    deltaW = outer_product(sleeppos_samples[i],
+                                           sleepdiff_i).data.mean(0)
+                    deltah = sleepdiff_i.data.mean(0)
+                    rbm.W.data += lr * deltaW
                     rbm.hbias.data += lr * deltah
-
 
     def generate(self, k=None):
         if k is None:
             k = self.k
-        rbm    = self.rbm_layers[-1]
+        rbm = self.rbm_layers[-1]
         sample = Variable(torch.zeros(rbm.vbias.size()))
         if self.use_gpu:
             sample = sample.cuda()
         for _ in range(k):
-            _, top    = rbm.sample_h_given_v(sample)
+            _, top = rbm.sample_h_given_v(sample)
             _, sample = rbm.sample_v_given_h(top)
         for rbm_layer in reversed(self.rbm_layers[:-1]):
             _, sample = rbm_layer.sample_v_given_h(sample)
         return sample
-
 
     def save_model(self, filename):
         dicts = []
@@ -233,14 +225,13 @@ class DBN(object):
             dicts.append(layer.state_dict())
         torch.save(dicts, filename)
 
-
     def load_model(self, filename):
         dicts = torch.load(filename)
         for i, layer in enumerate(self.rbm_layers + self.inference_layers):
             layer.load_state_dict(dicts[i])
 
 
-def test_dbn(pretrain_lr=1e-2, pretraining_epochs=30, k=5, finetune_lr=1e-3, \
+def test_dbn(pretrain_lr=1e-2, pretraining_epochs=30, k=5, finetune_lr=1e-3,
              finetune_epochs=30, batch_size=20, use_gpu=True):
 
     data = datasets.MNIST('../mnist',
@@ -248,23 +239,23 @@ def test_dbn(pretrain_lr=1e-2, pretraining_epochs=30, k=5, finetune_lr=1e-3, \
                           download=True).train_data.type(torch.FloatTensor)
     test = datasets.MNIST('../mnist',
                           train=False).test_data.type(torch.FloatTensor)
-    
+
     data = data.view((-1, 784)) / 255
     test = test.view((-1, 784)) / 255
-    
-    vis  = len(data[0])
-    
+
+    vis = len(data[0])
+
     # -------------------------------------------------------------------------
     # Construct DBN
     # -------------------------------------------------------------------------
     pre_trained = os.path.isfile('DBN.h5')
-    dbn         = DBN(n_visible=vis,
-                      hidden_layer_sizes=[30, 30],
-                      k=k,
-                      use_gpu=use_gpu)
+    dbn = DBN(n_visible=vis,
+              hidden_layer_sizes=[30, 30],
+              k=k,
+              use_gpu=use_gpu)
     if pre_trained:
         dbn.load_model('DBN.h5')
-    
+
     if use_gpu:
         for layer in dbn.rbm_layers:
             layer = layer.cuda()
@@ -273,10 +264,10 @@ def test_dbn(pretrain_lr=1e-2, pretraining_epochs=30, k=5, finetune_lr=1e-3, \
     # -------------------------------------------------------------------------
     if not pre_trained:
         validation = Variable(data)[:10000]
-        test       = Variable(test)
+        test = Variable(test)
         if use_gpu:
             validation = validation.cuda()
-            test       = test.cuda()
+            test = test.cuda()
         dbn.pretrain(input=data,
                      lr=pretrain_lr,
                      epochs=pretraining_epochs,
@@ -286,7 +277,7 @@ def test_dbn(pretrain_lr=1e-2, pretraining_epochs=30, k=5, finetune_lr=1e-3, \
                      lr=finetune_lr,
                      epochs=finetune_epochs,
                      batch_size=batch_size)
-    
+
         dbn.save_model('DBN.h5')
 
     # -------------------------------------------------------------------------
@@ -317,7 +308,8 @@ def test_dbn(pretrain_lr=1e-2, pretraining_epochs=30, k=5, finetune_lr=1e-3, \
     imageio.mimsave('dbn_sample.gif', images, duration=0.5)
     for i in range(10):
         plt.imsave('dbn_sample_{}.png'.format(i), images[20*i])
-                                   
+
+
 if __name__ == "__main__":
-    test_dbn(pretrain_lr=1e-2, pretraining_epochs=15, k=2, finetune_lr=1e-2, \
+    test_dbn(pretrain_lr=1e-2, pretraining_epochs=15, k=2, finetune_lr=1e-2,
              finetune_epochs=15, batch_size=20, use_gpu=True)
