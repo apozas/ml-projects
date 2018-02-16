@@ -17,18 +17,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
-from torch.utils.data import DataLoader
 from torchvision import datasets
 from tqdm import tqdm
 
 
 class RBM(nn.Module):
-    def __init__(self, input=None, n_visible=100, n_hidden=50, k=5,
-                 cuda_state=True, W=None, hbias=None, vbias=None):
+    def __init__(self, input_=None, n_visible=100, n_hidden=50, k=5,
+                 cuda_state=True, W=None, hbias=None, vbias=None,
+                 verbose=1):
 
         super(RBM, self).__init__()
         self.k = k
-        self.input = input
+        self.input = input_
         self.cuda_state = cuda_state
 
         if W is not None:
@@ -48,6 +48,7 @@ class RBM(nn.Module):
         else:
             self.vbias = nn.Parameter(torch.zeros(
                 n_visible))  # initialize v bias to 0
+        self.verbose = verbose
 
     def forward(self, v):
         v0 = v
@@ -60,9 +61,9 @@ class RBM(nn.Module):
         vbias_term = v.mv(self.vbias)
         wx_b = F.linear(v, self.W, self.hbias)
 
-        # Now we should do log(exp(wx_b) + 1). Instead, for numerical stability, we do the
-        # log-sum-exp trick, namely for large values of wx_b we do a + log(exp(wx_b - a) + exp(-a)),
-        # where a = max(0, wx_b).
+        # Now we should do log(exp(wx_b) + 1). Instead, for numerical
+        # stability, we do the log-sum-exp trick, namely for large values of
+        # wx_b we do a + log(exp(wx_b - a) + exp(-a)), where a = max(0, wx_b).
         zr = Variable(torch.zeros(wx_b.size()))
         if self.cuda_state:
             zr = zr.cuda()
@@ -82,7 +83,7 @@ class RBM(nn.Module):
     def reconstruct(self, v, k=None):
         if self.cuda_state:
             v = v.cuda()
-        if k == None:
+        if k is None:
             k = self.k
         for _ in range(k):
             _, h = self.sample_h_given_v(v)
@@ -103,11 +104,10 @@ class RBM(nn.Module):
             v_sample = v_sample.cuda()
         return [v_mean, v_sample]
 
-    def train(self, input, optimizer, epoch):
+    def train(self, input_, optimizer, epoch):
         loss_ = []
         error_ = []
-        count = 0
-        for iter, batch in enumerate(tqdm(input, desc='Epoch ' + str(epoch + 1))):
+        for _, batch in enumerate(tqdm(input_, desc='Epoch ' + str(epoch + 1))):
             sample_data = Variable(batch).float()
             if self.cuda_state:
                 sample_data = sample_data.cuda()
@@ -119,11 +119,13 @@ class RBM(nn.Module):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        print('Loss = ' + str(np.mean(loss_)))
-        print('Accuracy = ' + str(1 - np.mean(error_)))
+        if self.verbose > 0:
+            print('Loss = ' + str(np.mean(loss_)))
+            print('Accuracy = ' + str(1 - np.mean(error_)))
 
 
-def test_rbm(hidd=200, learning_rates=[1e-3] * 10, k=2, batch_size=30, cuda_state=True):
+def test_rbm(hidd=200, learning_rates=[1e-3] * 10, k=2, batch_size=30,
+             cuda_state=True):
 
     data = datasets.MNIST('mnist', train=True,
                           download=True).train_data.type(torch.FloatTensor)
@@ -139,9 +141,10 @@ def test_rbm(hidd=200, learning_rates=[1e-3] * 10, k=2, batch_size=30, cuda_stat
     train_loader = torch.utils.data.DataLoader(
         data, batch_size=batch_size, shuffle=True)
 
-    # According to Hinton this should be fine, but some biases diverge in the case of MNIST.
-    # Actually, this initialization is the inverse of the sigmoid. This is, it is the inverse of
-    # p = sigm(vbias), so it can be expected that during training the weights are close to zero and
+    # According to Hinton this should be fine, but some biases diverge in the
+    # case of MNIST. Actually, this initialization is the inverse of the
+    # sigmoid. This is, it is the inverse of p = sigm(vbias), so it can be
+    # expected that during training the weights are close to zero and
     # change little
     vbias = nn.Parameter(
         torch.log(data.mean(0) / (1 - data.mean(0))).clamp(-20, 20))
@@ -169,10 +172,11 @@ def test_rbm(hidd=200, learning_rates=[1e-3] * 10, k=2, batch_size=30, cuda_stat
         for epoch, learning_rate in enumerate(learning_rates):
             train_op = optim.SGD(rbm.parameters(), lr=learning_rate)
             rbm.train(train_loader, train_op, epoch)
-            # A good measure of well-fitting is the free energy difference between some known and
-            # unknown instances. It is related to the log-likelihood difference, but it does not
-            # depend on the partition function. It should be around 0, and if it grows, it might be
-            # overfitting to the training data
+            # A good measure of well-fitting is the free energy difference
+            # between some known and unknown instances. It is related to the
+            # log-likelihood difference, but it does not depend on the
+            # partition function. It should be around 0, and if it grows, it
+            # might be overfitting to the training data
             gap = rbm.free_energy(validation) - rbm.free_energy(test)
             print('Gap = ' + str(gap.data[0]))
         torch.save(rbm.state_dict(), 'RBM.h5')
@@ -202,4 +206,4 @@ def test_rbm(hidd=200, learning_rates=[1e-3] * 10, k=2, batch_size=30, cuda_stat
 if __name__ == "__main__":
     learning_rates = [1e-2] * 10
     test_rbm(hidd=30, learning_rates=learning_rates,
-             k=2, batch_size=20, cuda_state=True)
+             k=2, batch_size=20, cuda_state=False)
