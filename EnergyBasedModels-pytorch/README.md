@@ -17,15 +17,22 @@ Libraries required:
 with binary visible and hidden units. Although in this example it is used as a generative model,
 RBMs can also perform supervised tasks.
 #### Example
-![RBM](./rbm_sample.gif)
+![RBM](./RBM_sample.gif)
 
 ## 2. Continuous RBM
 Restricted Boltzmann Machine with binary hidden but continuous visible units.
 #### Example
-![CRBM](./crbm_sample.gif)
+![CRBM](./CRBM_sample.gif)
 
-## 3. To-Do list
+## 3. Deep Belief Network
+Deep belief network with greedy pre-training plus global finetuning.
+#### Example
+![CRBM](./DBN_sample.gif)
+
+## 4. To-Do list
 - [ ] Implement [Persistent Contrastive Divergence](http://www.cs.toronto.edu/~tijmen/pcd/pcd.pdf) for training
-- [ ] [Deep Belief Network](http://www.scholarpedia.org/article/Deep_belief_networks) with binary
+- [x] [Deep Belief Network](http://www.scholarpedia.org/article/Deep_belief_networks) with binary
 visible units
-- [ ] Deep Belief Network with continuous visible units 
+- [x] Deep Belief Network with continuous visible units
+- [ ] Remove the distinction between `Variable` and `Parameter` by just using
+`torch.Tensor`s
