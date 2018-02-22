@@ -26,8 +26,10 @@ Restricted Boltzmann Machine with binary hidden but continuous visible units.
 
 ## 3. Deep Belief Network
 Deep belief network with greedy pre-training plus global finetuning.
+A parameter of the model can do the visible layer to contain binary or
+continuous units.
 #### Example
-![CRBM](./DBN_sample.gif)
+![DBN](./DBN_sample.gif)
 
 ## 4. To-Do list
 - [ ] Implement [Persistent Contrastive Divergence](http://www.cs.toronto.edu/~tijmen/pcd/pcd.pdf) for training
@@ -35,4 +37,4 @@ Deep belief network with greedy pre-training plus global finetuning.
 visible units
 - [x] Deep Belief Network with continuous visible units
 - [ ] Remove the distinction between `Variable` and `Parameter` by just using
-`torch.Tensor`s
+`torch.Tensor`
