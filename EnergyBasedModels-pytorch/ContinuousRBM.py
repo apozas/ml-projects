@@ -20,13 +20,14 @@ from torch.autograd import Variable
 from torchvision import datasets
 from tqdm import tqdm
 
+
 class CRBM(RBM):
     def sample_v_given_h(self, h):
         '''This method of sampling is described in
-        
+
         Bengio, Y., Lamblin, P., Popovici, D., and Larochelle, H.,
         Greedy Layer-wise Training of Deep Networks
-        
+
         But it seems not to work better than keeping the probabilities of
         activation as the outputs themselves
         '''
@@ -36,8 +37,8 @@ class CRBM(RBM):
         # U       = Variable(torch.rand(a.size()))
         # zr      = Variable(torch.zeros(a.size()))
         # if a.is_cuda:
-            # U  = U.cuda()
-            # zr = zr.cuda()
+        #     U  = U.cuda()
+        #     zr = zr.cuda()
         # mask     = torch.max(zr, a)
         # v_sample = torch.div(mask
         #                      + (U * (a - mask).exp()
@@ -46,43 +47,45 @@ class CRBM(RBM):
         # return [v_probs, v_sample]
         v_probs = self.propdown(h)
         return [None, v_probs]
-        
-def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2, 
-             k_reconstruct=100, batch_size=30, model_dir='CRBM.h5', 
-             best_dir='CRBM_best.h5', use_gpu=True):
-    
+
+
+def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
+             k_reconstruct=100, batch_size=30, model_dir='CRBM.h5',
+             best_dir='CRBM_best.h5', use_gpu=False, verbose=0):
+
     data = datasets.MNIST('mnist',
                           train=True,
                           download=True).train_data.type(torch.FloatTensor)
     test = datasets.MNIST('mnist',
                           train=False).test_data.type(torch.FloatTensor)
-    
+
     data = data.view((-1, 784)) / 255
     test = test.view((-1, 784)) / 255
-    
-    vis  = len(data[0])
-    
+
+    vis = len(data[0])
+
     # According to Hinton this initialization of the visible biases should be
     # fine, but some biases diverge in the case of MNIST.
     # Actually, this initialization is the inverse of the sigmoid. This is, it
     # is the inverse of p = sigm(vbias), so it can be expected that during
     # training the weights are close to zero and change little
     vbias = nn.Parameter(torch.log(
-                                   data.mean(0) / (1 - data.mean(0))
-                                   ).clamp(-20, 20))
-	
+        data.mean(0) / (1 - data.mean(0))
+    ).clamp(-20, 20))
+
     # -------------------------------------------------------------------------
     # Construct RBM
     # -------------------------------------------------------------------------
     pre_trained = os.path.isfile('CRBM.h5')
-    rbm         = CRBM(n_visible=vis,
-                       n_hidden=hidd,
-                       k=k,
-                       use_gpu=use_gpu,
-                       vbias=vbias)
+    rbm = CRBM(n_visible=vis,
+               n_hidden=hidd,
+               k=k,
+               use_gpu=use_gpu,
+               vbias=vbias,
+               verbose=verbose)
     if pre_trained:
         rbm.load_state_dict(torch.load('CRBM.h5'))
-    
+
     if use_gpu:
         rbm = rbm.cuda()
     # -------------------------------------------------------------------------
@@ -90,15 +93,15 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
     # -------------------------------------------------------------------------
     if not pre_trained:
         validation = Variable(data)[:10000]
-        test       = Variable(test)
-        best_gap   = np.inf
+        test = Variable(test)
+        best_gap = np.inf
         look_ahead = 0
         epoch = 1
         while True:
             train_loader = torch.utils.data.DataLoader(data,
                                                        batch_size=batch_size,
                                                        shuffle=True)
-            metrics      = rbm.train(train_loader, learning_rate, epoch)
+            rbm.train(train_loader, learning_rate, epoch)
             # A good measure of well-fitting is the free energy difference
             # between some known and unknown instances. It is related to the
             # log-likelihood difference, but it does not depend on the
@@ -107,7 +110,6 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
             # High-probability instances have very negative free energy, so the
             # gap becoming very negative is sign of overfitting.
             gap = (rbm.free_energy(validation) - rbm.free_energy(test)).mean(0)
-            print('Rec. error = ' + str(metrics))
             print('Gap = {}'.format(gap.data[0]))
             if abs(gap.data[0]) < best_gap:
                 best_gap = abs(gap.data[0])
@@ -121,7 +123,7 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
                 break
             epoch += 1
         torch.save(rbm.state_dict(), model_dir)
-    
+
     # -------------------------------------------------------------------------
     # Plotting
     # -------------------------------------------------------------------------
@@ -140,8 +142,9 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
                     image[28*k:28*(k+1), 28*l:28*(l+1)] = datas[k + 5*l, :, :]
             images.append(image)
     imageio.mimsave('CRBM_sample.gif', images, duration=0.1)
-	
+
+
 if __name__ == "__main__":
     test_rbm(hidd=30, learning_rate=1e-3, max_look_ahead=20, k=20,
              k_reconstruct=2000, batch_size=20, model_dir='CRBM.h5',
-             best_dir='CRBM_best.h5', use_gpu=True)
+             best_dir='CRBM_best.h5', use_gpu=False, verbose=1)
