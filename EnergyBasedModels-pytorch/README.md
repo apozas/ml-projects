@@ -32,7 +32,7 @@ continuous units.
 ![DBN](./DBN_sample.gif)
 
 ## 4. To-Do list
-- [ ] Implement [Persistent Contrastive Divergence](http://www.cs.toronto.edu/~tijmen/pcd/pcd.pdf) for training
+- [x] Implement [Persistent Contrastive Divergence](http://www.cs.toronto.edu/~tijmen/pcd/pcd.pdf) for training
 - [x] [Deep Belief Network](http://www.scholarpedia.org/article/Deep_belief_networks) with binary
 visible units
 - [x] Deep Belief Network with continuous visible units
