@@ -242,7 +242,7 @@ class DBN(object):
 
 
 def test_dbn(pretrain_lr=1e-2, look_ahead_pretrain=20, k=5, finetune_lr=1e-3,
-             finetune_epochs=30, batch_size=20, use_gpu=True):
+             finetune_epochs=30, batch_size=20, use_gpu=True, pcd=True):
 
     data = datasets.MNIST('mnist',
                           train=True,
@@ -262,7 +262,8 @@ def test_dbn(pretrain_lr=1e-2, look_ahead_pretrain=20, k=5, finetune_lr=1e-3,
     dbn         = DBN(n_visible=vis,
                       hidden_layer_sizes=[30, 30],
                       k=k,
-                      use_gpu=use_gpu)
+                      use_gpu=use_gpu,
+                      persistent=pcd)
     if pre_trained:
         dbn.load_model('DBN.h5')
     
@@ -317,4 +318,4 @@ def test_dbn(pretrain_lr=1e-2, look_ahead_pretrain=20, k=5, finetune_lr=1e-3,
                                    
 if __name__ == "__main__":
     test_dbn(pretrain_lr=1e-2, look_ahead_pretrain=20, k=2, finetune_lr=1e-4,
-             finetune_epochs=10, batch_size=20, use_gpu=True)
+             finetune_epochs=10, batch_size=20, use_gpu=False, pcd=True)

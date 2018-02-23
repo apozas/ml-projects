@@ -51,7 +51,7 @@ class CRBM(RBM):
 
 def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
              k_reconstruct=100, batch_size=30, model_dir='CRBM.h5',
-             best_dir='CRBM_best.h5', use_gpu=False, verbose=0):
+             best_dir='CRBM_best.h5', use_gpu=False, verbose=0, pcd=True):
 
     data = datasets.MNIST('mnist',
                           train=True,
@@ -82,7 +82,8 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
                k=k,
                use_gpu=use_gpu,
                vbias=vbias,
-               verbose=verbose)
+               verbose=verbose,
+               persistent=pcd)
     if pre_trained:
         rbm.load_state_dict(torch.load('CRBM.h5'))
 
@@ -147,4 +148,4 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
 if __name__ == "__main__":
     test_rbm(hidd=30, learning_rate=1e-3, max_look_ahead=20, k=20,
              k_reconstruct=2000, batch_size=20, model_dir='CRBM.h5',
-             best_dir='CRBM_best.h5', use_gpu=False, verbose=1)
+             best_dir='CRBM_best.h5', use_gpu=False, verbose=1, pcd=False)
