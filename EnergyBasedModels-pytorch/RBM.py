@@ -1,4 +1,5 @@
-# Restricted Boltzmann Machine trained by Contrastive Divergence
+# Restricted Boltzmann Machine trained by (optionally Persistent)
+# Contrastive Divergence
 #
 # Author: Alejandro Pozas-Kerstjens
 # Requires: numpy for numerics
@@ -54,13 +55,14 @@ def log1pexp(tensor):
 
 class RBM(nn.Module):
     def __init__(self, n_visible=100, n_hidden=50, k=5,
-	             use_gpu=False, verbose=0,
+	             persistent=False, use_gpu=False, verbose=0,
                  W=None, hbias=None, vbias=None):
 
         super(RBM, self).__init__()
         self.k = k
         self.use_gpu = use_gpu
         self.verbose = verbose
+        self.persistent = persistent
 
         if W is not None:
             self.W = W
@@ -124,12 +126,25 @@ class RBM(nn.Module):
 
     def train(self, input_data, lr, epoch):
         error_ = []
-        for _, batch in enumerate(tqdm(input_data,
-                                       desc='Epoch ' + str(epoch))):
+        if self.persistent:   # Inititalize random Markov chains in case of PCD
+            mc_size = list(input_data)[0].size()
+            markov_chains = Variable(torch.rand((mc_size)))
+            if self.use_gpu:
+                markov_chains = markov_chains.cuda()
+        for batch in tqdm(input_data, desc='Epoch ' + str(epoch)):
             sample_data = Variable(batch).float()
             if self.use_gpu:
                 sample_data = sample_data.cuda()
-            v0, h0_probs, v1, h1_probs = self.forward(sample_data)
+            if self.persistent:
+                # Get positive phase from the data
+                v0 = sample_data
+                h0_probs = self.propup(v0)
+                # Get negative phase from the chains, and keep their state
+                _, _, v1, h1_probs = self.forward(markov_chains)
+                markov_chains = v1
+            else:
+                v0, h0_probs, v1, h1_probs = self.forward(sample_data)
+            
             deltaW = (outer_product(h0_probs, v0)
                       - outer_product(h1_probs, v1)).data.mean(0)
             deltah = (h0_probs - h1_probs).data.mean(0)
@@ -141,13 +156,14 @@ class RBM(nn.Module):
 
             rec_error = F.mse_loss(v1, v0)
             error_.append(rec_error.data[0])
+            
         if self.verbose > 0:
             print('Reconstruction error = ' + str(np.mean(error_)))
 
 
-def test_rbm(hidd = 200, learning_rate = 1e-2, max_look_ahead = 100, k = 2,
+def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
              k_reconstruct=100, batch_size=30, model_dir='RBM.h5', 
-             best_dir='RBM_best.h5', use_gpu=True, verbose=0):
+             best_dir='RBM_best.h5', use_gpu=True, verbose=0, pcd=True):
     
     data = datasets.MNIST('mnist',
                           train=True,
@@ -180,7 +196,8 @@ def test_rbm(hidd = 200, learning_rate = 1e-2, max_look_ahead = 100, k = 2,
                       k=k,
                       use_gpu=use_gpu,
                       vbias=vbias,
-                      verbose=verbose)
+                      verbose=verbose,
+                      persistent=pcd)
     if pre_trained:
         rbm.load_state_dict(torch.load(best_dir))
     
@@ -245,4 +262,4 @@ def test_rbm(hidd = 200, learning_rate = 1e-2, max_look_ahead = 100, k = 2,
 if __name__ == "__main__":
     test_rbm(hidd=30, learning_rate=1e-3, max_look_ahead=15, k=2,
              k_reconstruct=2000, batch_size=10, model_dir='RBM.h5',
-             best_dir='RBM_best.h5', use_gpu=False, verbose=1)
+             best_dir='RBM_best.h5', use_gpu=False, verbose=1, pcd=True)
