@@ -36,5 +36,3 @@ continuous units.
 - [x] [Deep Belief Network](http://www.scholarpedia.org/article/Deep_belief_networks) with binary
 visible units
 - [x] Deep Belief Network with continuous visible units
-- [ ] Remove the distinction between `Variable` and `Parameter` by just using
-`torch.Tensor`
