@@ -49,9 +49,10 @@ class CRBM(RBM):
         return [None, v_probs]
 
 
-def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
-             k_reconstruct=100, batch_size=30, model_dir='CRBM.h5',
-             best_dir='CRBM_best.h5', use_gpu=False, verbose=0, pcd=True):
+def test_rbm(hidd=200, learning_rate=1e-2, weight_decay=0, momentum=0,
+             max_look_ahead=100, k=2, k_reconstruct=100, batch_size=30,
+             model_dir='CRBM.h5', best_dir='CRBM_best.h5', use_gpu=False,
+             verbose=0, pcd=True):
 
     data = datasets.MNIST('mnist',
                           train=True,
@@ -102,7 +103,8 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
             train_loader = torch.utils.data.DataLoader(data,
                                                        batch_size=batch_size,
                                                        shuffle=True)
-            rbm.train(train_loader, learning_rate, epoch)
+            rbm.train(train_loader, learning_rate,
+                      weight_decay, momentum, epoch)
             # A good measure of well-fitting is the free energy difference
             # between some known and unknown instances. It is related to the
             # log-likelihood difference, but it does not depend on the
@@ -146,6 +148,7 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
 
 
 if __name__ == "__main__":
-    test_rbm(hidd=30, learning_rate=1e-3, max_look_ahead=20, k=20,
-             k_reconstruct=2000, batch_size=20, model_dir='CRBM.h5',
-             best_dir='CRBM_best.h5', use_gpu=False, verbose=1, pcd=False)
+    test_rbm(hidd=30, learning_rate=1e-3, weight_decay=1e-4, momentum=0.9,
+             max_look_ahead=20, k=20, k_reconstruct=2000, batch_size=20,
+             model_dir='CRBM.h5', best_dir='CRBM_best.h5', use_gpu=False,
+             verbose=1, pcd=True)

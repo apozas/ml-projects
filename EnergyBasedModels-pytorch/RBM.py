@@ -68,16 +68,24 @@ class RBM(nn.Module):
             self.W = W
         else:
             self.W = nn.Parameter(0.01 * torch.randn(n_hidden, n_visible))
+        self.W_update = self.W.clone()
 
         if hbias is not None:
             self.hbias = hbias
         else:
             self.hbias = nn.Parameter(torch.zeros(n_hidden))
+        self.hbias_update = self.hbias.clone()
 
         if vbias is not None:
             self.vbias = vbias
         else:
             self.vbias = nn.Parameter(torch.zeros(n_visible))
+        self.vbias_update = self.vbias.clone()
+        
+        if self.use_gpu:
+            self.W_update = self.W_update.cuda()
+            self.hbias_update = self.hbias_update.cuda()
+            self.vbias_update = self.vbias_update.cuda()
 
     def forward(self, v0):
         h0_probs, h = self.sample_h_given_v(v0)
@@ -124,7 +132,7 @@ class RBM(nn.Module):
         v_sample = v_probs.bernoulli()
         return [v_probs, v_sample]
 
-    def train(self, input_data, lr, epoch):
+    def train(self, input_data, lr, weight_decay, momentum, epoch):
         error_ = []
         if self.persistent:   # Inititalize random Markov chains in case of PCD
             mc_size = list(input_data)[0].size()
@@ -135,6 +143,7 @@ class RBM(nn.Module):
             sample_data = Variable(batch).float()
             if self.use_gpu:
                 sample_data = sample_data.cuda()
+            # Sampling from the model to compute updates
             if self.persistent:
                 # Get positive phase from the data
                 v0 = sample_data
@@ -145,14 +154,29 @@ class RBM(nn.Module):
             else:
                 v0, h0_probs, v1, h1_probs = self.forward(sample_data)
             
+            # Weight updates. Includes momentum and weight decay
+            self.W_update.data *= momentum
+            self.hbias_update.data *= momentum
+            self.vbias_update.data *= momentum
+            
+            # Weight decay is only applied to W, because they are the maximum
+            # responsibles for overfitting
+            # Note that we multiply by the learning rate, so the function
+            # optimized is (NLL - weight_decay * W)
+            self.W_update.data -= lr * weight_decay * self.W.data
+            
             deltaW = (outer_product(h0_probs, v0)
                       - outer_product(h1_probs, v1)).data.mean(0)
             deltah = (h0_probs - h1_probs).data.mean(0)
             deltav = (v0 - v1).data.mean(0)
 
-            self.W.data += lr * deltaW
-            self.hbias.data += lr * deltah
-            self.vbias.data += lr * deltav
+            self.W_update.data += lr * deltaW
+            self.hbias_update.data += lr * deltah
+            self.vbias_update.data += lr * deltav
+
+            self.W.data += self.W_update.data
+            self.hbias.data += self.hbias_update.data
+            self.vbias.data += self.vbias_update.data
 
             rec_error = F.mse_loss(v1, v0)
             error_.append(rec_error.data[0])
@@ -161,9 +185,10 @@ class RBM(nn.Module):
             print('Reconstruction error = ' + str(np.mean(error_)))
 
 
-def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
-             k_reconstruct=100, batch_size=30, model_dir='RBM.h5', 
-             best_dir='RBM_best.h5', use_gpu=True, verbose=0, pcd=True):
+def test_rbm(hidd=200, learning_rate=1e-2, weight_decay=0, momentum=0,
+             max_look_ahead=100, k=2, k_reconstruct=100, batch_size=30,
+             model_dir='RBM.h5', best_dir='RBM_best.h5', use_gpu=True,
+             verbose=0, pcd=True):
     
     data = datasets.MNIST('mnist',
                           train=True,
@@ -216,7 +241,8 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
             train_loader = torch.utils.data.DataLoader(data,
                                                        batch_size=batch_size,
                                                        shuffle=True)
-            rbm.train(train_loader, learning_rate, epoch)
+            rbm.train(train_loader, learning_rate,
+                      weight_decay, momentum, epoch)
             # A good measure of well-fitting is the free energy difference
             # between some known and unknown instances. It is related to the
             # log-likelihood difference, but it does not depend on the
@@ -260,6 +286,7 @@ def test_rbm(hidd=200, learning_rate=1e-2, max_look_ahead=100, k=2,
 
 
 if __name__ == "__main__":
-    test_rbm(hidd=30, learning_rate=1e-3, max_look_ahead=15, k=2,
-             k_reconstruct=2000, batch_size=10, model_dir='RBM.h5',
-             best_dir='RBM_best.h5', use_gpu=False, verbose=1, pcd=True)
+    test_rbm(hidd=30, learning_rate=1e-3, weight_decay=1e-4, momentum=0.9,
+             max_look_ahead=1000, k=2, k_reconstruct=2000, batch_size=10,
+             model_dir='RBM.h5', best_dir='RBM_best.h5', use_gpu=False,
+             verbose=1, pcd=True)

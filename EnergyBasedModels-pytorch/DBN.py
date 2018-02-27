@@ -57,8 +57,8 @@ class DBN(object):
             
 
 
-    def pretrain(self, input_data, lr=0.1, max_look_ahead=15,
-                 batch_size=10, test=None):
+    def pretrain(self, input_data, lr=0.1, weight_decay=0, momentum=0,
+                 max_look_ahead=15, batch_size=10, test=None):
         # Pre-train the DBN as individual RBMs
         for i in range(self.n_layers):
             print('#########################################')
@@ -84,7 +84,7 @@ class DBN(object):
                 layer_loader = torch.utils.data.DataLoader(layer_input,
                                                          batch_size=batch_size,
                                                          shuffle=True)
-                rbm.train(input_data=layer_loader, lr=lr, epoch=epoch)
+                rbm.train(layer_loader, lr, weight_decay, momentum, epoch)
                 if test is not None:
                     validation = Variable(layer_input)[:10000]
                     if self.use_gpu:
@@ -241,7 +241,8 @@ class DBN(object):
             layer.load_state_dict(dicts[i])
 
 
-def test_dbn(pretrain_lr=1e-2, look_ahead_pretrain=20, k=5, finetune_lr=1e-3,
+def test_dbn(pretrain_lr=1e-2, weight_decay=1e-4, momentum=0.9,
+             look_ahead_pretrain=20, k=5, finetune_lr=1e-3,
              finetune_epochs=30, batch_size=20, use_gpu=True, pcd=True):
 
     data = datasets.MNIST('mnist',
@@ -279,6 +280,8 @@ def test_dbn(pretrain_lr=1e-2, look_ahead_pretrain=20, k=5, finetune_lr=1e-3,
             test       = test.cuda()
         dbn.pretrain(input_data=data,
                      lr=pretrain_lr,
+                     weight_decay=weight_decay,
+                     momentum=momentum,
                      max_look_ahead=look_ahead_pretrain,
                      batch_size=batch_size,
                      test=test)
@@ -317,5 +320,6 @@ def test_dbn(pretrain_lr=1e-2, look_ahead_pretrain=20, k=5, finetune_lr=1e-3,
     imageio.mimsave('DBN_sample.gif', images, duration=0.1)
                                    
 if __name__ == "__main__":
-    test_dbn(pretrain_lr=1e-2, look_ahead_pretrain=20, k=2, finetune_lr=1e-4,
+    test_dbn(pretrain_lr=1e-2, weight_decay=1e-4, momentum=0.9,
+             look_ahead_pretrain=20, k=2, finetune_lr=1e-4,
              finetune_epochs=10, batch_size=20, use_gpu=False, pcd=True)
