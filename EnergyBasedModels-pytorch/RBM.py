@@ -55,14 +55,13 @@ def log1pexp(tensor):
 
 class RBM(nn.Module):
     def __init__(self, n_visible=100, n_hidden=50, k=5,
-	             persistent=False, use_gpu=False, verbose=0,
+	             use_gpu=False, verbose=0,
                  W=None, hbias=None, vbias=None):
 
         super(RBM, self).__init__()
         self.k = k
         self.use_gpu = use_gpu
         self.verbose = verbose
-        self.persistent = persistent
 
         if W is not None:
             self.W = W
@@ -132,9 +131,9 @@ class RBM(nn.Module):
         v_sample = v_probs.bernoulli()
         return [v_probs, v_sample]
 
-    def train(self, input_data, lr, weight_decay, momentum, epoch):
+    def train(self, input_data, lr, weight_decay, momentum, persistent, epoch):
         error_ = []
-        if self.persistent:   # Inititalize random Markov chains in case of PCD
+        if persistent:   # Inititalize random Markov chains in case of PCD
             mc_size = list(input_data)[0].size()
             markov_chains = Variable(torch.rand((mc_size)))
             if self.use_gpu:
@@ -144,7 +143,7 @@ class RBM(nn.Module):
             if self.use_gpu:
                 sample_data = sample_data.cuda()
             # Sampling from the model to compute updates
-            if self.persistent:
+            if persistent:
                 # Get positive phase from the data
                 v0 = sample_data
                 h0_probs = self.propup(v0)
@@ -221,8 +220,7 @@ def test_rbm(hidd=200, learning_rate=1e-2, weight_decay=0, momentum=0,
                       k=k,
                       use_gpu=use_gpu,
                       vbias=vbias,
-                      verbose=verbose,
-                      persistent=pcd)
+                      verbose=verbose)
     if pre_trained:
         rbm.load_state_dict(torch.load(best_dir))
     
@@ -242,7 +240,7 @@ def test_rbm(hidd=200, learning_rate=1e-2, weight_decay=0, momentum=0,
                                                        batch_size=batch_size,
                                                        shuffle=True)
             rbm.train(train_loader, learning_rate,
-                      weight_decay, momentum, epoch)
+                      weight_decay, momentum, pcd, epoch)
             # A good measure of well-fitting is the free energy difference
             # between some known and unknown instances. It is related to the
             # log-likelihood difference, but it does not depend on the

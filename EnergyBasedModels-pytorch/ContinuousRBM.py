@@ -83,8 +83,7 @@ def test_rbm(hidd=200, learning_rate=1e-2, weight_decay=0, momentum=0,
                k=k,
                use_gpu=use_gpu,
                vbias=vbias,
-               verbose=verbose,
-               persistent=pcd)
+               verbose=verbose)
     if pre_trained:
         rbm.load_state_dict(torch.load('CRBM.h5'))
 
@@ -104,7 +103,7 @@ def test_rbm(hidd=200, learning_rate=1e-2, weight_decay=0, momentum=0,
                                                        batch_size=batch_size,
                                                        shuffle=True)
             rbm.train(train_loader, learning_rate,
-                      weight_decay, momentum, epoch)
+                      weight_decay, momentum, pcd, epoch)
             # A good measure of well-fitting is the free energy difference
             # between some known and unknown instances. It is related to the
             # log-likelihood difference, but it does not depend on the

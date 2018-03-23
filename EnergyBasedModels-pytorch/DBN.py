@@ -58,7 +58,7 @@ class DBN(object):
 
 
     def pretrain(self, input_data, lr=0.1, weight_decay=0, momentum=0,
-                 max_look_ahead=15, batch_size=10, test=None):
+                 max_look_ahead=15, batch_size=10, pcd=True, test=None):
         # Pre-train the DBN as individual RBMs
         for i in range(self.n_layers):
             print('#########################################')
@@ -84,7 +84,7 @@ class DBN(object):
                 layer_loader = torch.utils.data.DataLoader(layer_input,
                                                          batch_size=batch_size,
                                                          shuffle=True)
-                rbm.train(layer_loader, lr, weight_decay, momentum, epoch)
+                rbm.train(layer_loader, lr, weight_decay, momentum, pcd, epoch)
                 if test is not None:
                     validation = Variable(layer_input)[:10000]
                     if self.use_gpu:
@@ -263,8 +263,7 @@ def test_dbn(pretrain_lr=1e-2, weight_decay=1e-4, momentum=0.9,
     dbn         = DBN(n_visible=vis,
                       hidden_layer_sizes=[30, 30],
                       k=k,
-                      use_gpu=use_gpu,
-                      persistent=pcd)
+                      use_gpu=use_gpu)
     if pre_trained:
         dbn.load_model('DBN.h5')
     
