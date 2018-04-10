@@ -3,9 +3,7 @@
 # Author: Alejandro Pozas-Kerstjens
 # Requires: numpy for numerics
 #           pytorch as ML framework
-#           matplotlib for plots
 #           tqdm for progress bar
-#           imageio for output export
 # Last modified: Apr, 2018
 
 import numpy as np
@@ -25,7 +23,6 @@ def outer_product(vecs1, vecs2):
         :type vecs1: list of torch.Tensor or torch.autograd.Variable
         :param vecs2: b 1-D tensors of length n
         :type vecs2: list of torch.Tensor or torch.autograd.Variable
-
         :returns: torch.Tensor or torch.autograd.Variable of size (m, n)
        '''
     return torch.bmm(vecs1.unsqueeze(2), vecs2.unsqueeze(1))
@@ -35,15 +32,11 @@ def log1pexp(tensor):
     '''Computes pointwise log(1+exp()) for all elements in a torch tensor. The
     way of computing it without under- or overflows is through the
     log-sum-exp trick, namely computing
-
     log(1+exp(x)) = a + log(exp(-a) + exp(x-a))     with a = max(0, x)
-
     The function is adapted to be used in GPU if needed.
     
     Arguments:
-
         :param tensor: torch.Tensor or torch.autograd.Variable
-
         :returns: torch.Tensor or torch.autograd.Variable
        '''
     zr = Variable(torch.zeros(tensor.size()))

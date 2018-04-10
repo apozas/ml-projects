@@ -198,8 +198,7 @@ class PersistentContrastiveDivergence(ContrastiveDivergence):
             :param gpu: Optional parameter to indicate GPU use.
             :type gpu: bool
         """
-        super(ContrastiveDivergence, self).__init__(k, gpu, hidden_activations,
-                                                    continuous_output)
+        super().__init__(k, gpu, hidden_activations, continuous_output)
         self.first_call = True
         
     def get_v_sample(self, v0, W, vbias, hbias):
@@ -221,13 +220,14 @@ class PersistentContrastiveDivergence(ContrastiveDivergence):
                       visible nodes
         """
         if self.first_call:
-            self.markov_chains = Variable(torch.rand((v0.size(0),
-                                                      W.size(1))))
+            self.markov_chains = Variable(torch.rand((v0.size(0), W.size(1))))
             if self.backend == "gpu":
                 self.markov_chains = markov_chains.cuda()
-            self.first_call = False  
+            self.first_call = False
+        self.internal_sampling = True
         for _ in range(self.k):
             h = self.get_h_from_v(self.markov_chains, W, hbias)
             v = self.get_v_from_h(h, W, vbias)
             self.markov_chains = v
+        self.internal_sampling = False
         return v
