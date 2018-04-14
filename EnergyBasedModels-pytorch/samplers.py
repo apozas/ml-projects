@@ -222,7 +222,7 @@ class PersistentContrastiveDivergence(ContrastiveDivergence):
         if self.first_call:
             self.markov_chains = Variable(torch.rand((v0.size(0), W.size(1))))
             if self.backend == "gpu":
-                self.markov_chains = markov_chains.cuda()
+                self.markov_chains = self.markov_chains.cuda()
             self.first_call = False
         self.internal_sampling = True
         for _ in range(self.k):
