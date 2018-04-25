@@ -70,7 +70,7 @@ class Sampler(object):
 
 class ContrastiveDivergence(Sampler):
 
-    def __init__(self, k, gpu=False, hidden_activations=False,
+    def __init__(self, k, dropout=0, gpu=False, hidden_activations=False,
                  continuous_output=False):
         """Constructor for the class.
         
@@ -78,6 +78,10 @@ class ContrastiveDivergence(Sampler):
         
             :param k: The number of iterations in CD-k
             :type k: int
+            :param dropout: Optional parameter, fraction of neurons in the
+                            previous layer that are not taken into account when
+                            getting a sample.
+            :type dropout: float
             :param gpu: Optional parameter to indicate GPU use.
             :type gpu: bool
             :param hidden_activations: Optional parameter to output hidden
@@ -92,6 +96,9 @@ class ContrastiveDivergence(Sampler):
         super(ContrastiveDivergence, self).__init__()
         assert k > 0, 'You should specify a number of Gibbs steps > 0'
         self.k = k
+        assert (dropout >=0) and (dropout <=1), ('The dropout rate' +
+                                                 ' should be in [0, 1]')
+        self.dropout = dropout
         self.internal_sampling = False
         self.gpu = gpu
         if self.gpu:
@@ -125,7 +132,7 @@ class ContrastiveDivergence(Sampler):
             if v is None:
                 h = self.get_h_from_v(v0, W, hbias)
             else:
-                h = self.get_h_from_v(v, W, hbias)
+                h = self.get_h_from_v(v1, W, hbias)
             v = self.get_v_from_h(h, W, vbias)
         self.internal_sampling = False
         return v
@@ -173,18 +180,18 @@ class ContrastiveDivergence(Sampler):
     def _propdown(self, h, W, vbias):
         if ((self.backend == "gpu") and not h.is_cuda):
             h = h.cuda()
-        pre_sigmoid_activation = F.linear(h, W.t(), vbias)
+        pre_sigmoid_activation = F.linear(F.dropout(h, self.dropout), W.t(), vbias)
         return F.sigmoid(pre_sigmoid_activation) 
 
     def _propup(self, v, W, hbias):
         if ((self.backend == "gpu") and not v.is_cuda):
             v = v.cuda()
-        pre_sigmoid_activation = F.linear(v, W, hbias)
+        pre_sigmoid_activation = F.linear(F.dropout(v, self.dropout), W, hbias)
         return F.sigmoid(pre_sigmoid_activation)
 
 class PersistentContrastiveDivergence(ContrastiveDivergence):
 
-    def __init__(self, k, gpu=False, hidden_activations=False,
+    def __init__(self, k, dropout=0, gpu=False, hidden_activations=False,
                  continuous_output=False):
         """Constructor for the class.
         
@@ -192,13 +199,19 @@ class PersistentContrastiveDivergence(ContrastiveDivergence):
         
             :param k: The number of iterations in PCD-k
             :type k: int
+            :param dropout: Optional parameter, fraction of neurons in the
+                            previous layer that are not taken into account when
+                            getting a sample.
+            :type dropout: float
             :param batch_size: The batch size defines the number of
                                Markov chains
             :type batch_size: int
             :param gpu: Optional parameter to indicate GPU use.
             :type gpu: bool
         """
-        super().__init__(k, gpu, hidden_activations, continuous_output)
+        super().__init__(k, dropout, gpu,
+                         hidden_activations,
+                         continuous_output)
         self.first_call = True
         
     def get_v_sample(self, v0, W, vbias, hbias):
