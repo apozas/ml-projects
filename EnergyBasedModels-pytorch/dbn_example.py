@@ -5,21 +5,16 @@
 #           pytorch as ML framework
 #           matplotlib for plots
 #           imageio for output export
-# Last modified: Apr, 2018
+# Last modified: Jun, 2018
 
 import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from RBM import outer_product
 from DBN import DBN
-from samplers import ContrastiveDivergence
-from torch.autograd import Variable
+from samplers import PersistentContrastiveDivergence
 from torchvision import datasets
-from torch.utils.data import DataLoader
 
 #------------------------------------------------------------------------------
 # Parameter choices
@@ -38,14 +33,21 @@ continuous_out  = True        # Whether we want continuous outputs or not
 sample_copies   = 5           # Number of samples taken from the hidden
                               # representation of each datapoint
 
+#------------------------------------------------------------------------------
+# Data preparation
+#------------------------------------------------------------------------------
+
+device = torch.device('cuda' if gpu else 'cpu')
+
 data = datasets.MNIST('mnist',
                       train=True,
-                      download=True).train_data.type(torch.FloatTensor)
+                      download=True).train_data.type(torch.float)
+                      
 test = datasets.MNIST('mnist',
-                      train=False).test_data.type(torch.FloatTensor)
+                      train=False).test_data.type(torch.float)
 
-data = data.view((-1, 784)) / 255
-test = test.view((-1, 784)) / 255
+data = (data.view((-1, 784)) / 255).to(device)
+test = (test.view((-1, 784)) / 255).to(device)
 
 vis  = len(data[0])
 
@@ -54,28 +56,19 @@ vis  = len(data[0])
 # -----------------------------------------------------------------------------
 pre_trained = os.path.isfile('DBN.h5')
 
-sampler = ContrastiveDivergence(k=k,
-                                gpu=gpu,
-                                hidden_activations=True)
+sampler = PersistentContrastiveDivergence(k=k, hidden_activations=True)
 dbn     = DBN(n_visible=vis,
               hidden_layer_sizes=hidden_layers,
               sample_copies=sample_copies,
               sampler=sampler,
               continuous_output=continuous_out,
-              gpu=gpu)
+              device=device)
 if pre_trained:
     dbn.load_model('DBN.h5')
-
-if gpu:
-    for layer in dbn.gen_layers:
-        layer = layer.cuda()
 # -----------------------------------------------------------------------------
 # Training
 # -----------------------------------------------------------------------------
 if not pre_trained:
-    test = Variable(test)
-    if gpu:
-        test = test.cuda()
     dbn.pretrain(input_data=data,
                  lr=pretrain_lr,
                  weight_decay=weight_decay,
@@ -98,11 +91,10 @@ print('#          Generating samples           #')
 print('#########################################')
 top_RBM = dbn.gen_layers[-1]
 plt.figure(figsize=(20, 10))
-zero = Variable(torch.zeros(25, len(top_RBM.vbias)))
-if gpu:
-    zero = zero.cuda()
+zero = torch.zeros(25, len(top_RBM.vbias)).to(device)
 images = [np.zeros((5 * 28, 5 * 28))]
 for i in range(200):
+    sampler.continuous_output = False
     zero = sampler.get_h_from_v(zero, top_RBM.W, top_RBM.hbias)
     zero = sampler.get_v_from_h(zero, top_RBM.W, top_RBM.vbias)
     sample = zero

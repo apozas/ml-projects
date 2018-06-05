@@ -6,18 +6,16 @@
 #           matplotlib for plots
 #           tqdm for progress bar
 #           imageio for output export
-# Last modified: Apr, 2018
+# Last modified: Jun, 2018
 
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from samplers import PersistentContrastiveDivergence
 from RBM import RBM
-from torch.autograd import Variable
 from torchvision import datasets
 from tqdm import tqdm
 
@@ -39,15 +37,18 @@ verbose        = 1             # Additional information printout
 #------------------------------------------------------------------------------
 # Data preparation
 #------------------------------------------------------------------------------
-             
+
+device = torch.device('cuda' if gpu else 'cpu')
+
 data = datasets.MNIST('mnist',
                       train=True,
-                      download=True).train_data.type(torch.FloatTensor)
+                      download=True).train_data.type(torch.float)
+                      
 test = datasets.MNIST('mnist',
-                      train=False).test_data.type(torch.FloatTensor)
+                      train=False).test_data.type(torch.float)
 
-data = data.view((-1, 784)) / 255
-test = test.view((-1, 784)) / 255
+data = (data.view((-1, 784)) / 255).to(device)
+test = (test.view((-1, 784)) / 255).to(device)
 
 vis = len(data[0])
 
@@ -56,35 +57,29 @@ vis = len(data[0])
 # Actually, this initialization is the inverse of the sigmoid. This is, it
 # is the inverse of p = sigm(vbias), so it can be expected that during
 # training the weights are close to zero and change little
-vbias = nn.Parameter(torch.log(data.mean(0)/(1 - data.mean(0))).clamp(-20, 20))
+vbias = torch.log(data.mean(0)/(1 - data.mean(0))).clamp(-20, 20)
 
 # -----------------------------------------------------------------------------
-# Construct CRBM
+# Construct RBM
 # -----------------------------------------------------------------------------
 sampler = PersistentContrastiveDivergence(k=k,
-                                          gpu=gpu,
                                           hidden_activations=True,
                                           continuous_output=True)
 rbm = RBM(n_visible=vis,
           n_hidden=hidd,
           sampler=sampler,
-          gpu=gpu,
+          device=device,
           vbias=vbias,
           verbose=verbose)
 pre_trained = os.path.isfile(model_dir)
 if pre_trained:
     rbm.load_state_dict(torch.load(model_dir))
 
-if gpu:
-    rbm = rbm.cuda()
 # -----------------------------------------------------------------------------
 # Training
 # -----------------------------------------------------------------------------
 if not pre_trained:
-    validation = Variable(data)[:10000]
-    test       = Variable(test)
-    best_gap   = np.inf
-    look_ahead = 0
+    validation = data[:10000]
     for epoch in range(epochs):
         train_loader = torch.utils.data.DataLoader(data,
                                                    batch_size=batch_size,
@@ -99,7 +94,8 @@ if not pre_trained:
         # High-probability instances have very negative free energy, so the
         # gap becoming very negative is sign of overfitting.
         gap = (rbm.free_energy(validation) - rbm.free_energy(test)).mean(0)
-        print('Gap = {}'.format(gap.data[0]))
+        print('Gap = {}'.format(gap.item()))
+        
     torch.save(rbm.state_dict(), model_dir)
 
 # -----------------------------------------------------------------------------
@@ -107,8 +103,8 @@ if not pre_trained:
 # -----------------------------------------------------------------------------
 print('Reconstructing images')
 plt.figure(figsize=(20, 10))
-zero = Variable(torch.zeros(25, 784))
-images = [zero.data.numpy().reshape((5 * 28, 5 * 28))]
+zero = torch.zeros(25, 784).to(device)
+images = [zero.cpu().numpy().reshape((5 * 28, 5 * 28))]
 sampler.internal_sampling = True
 for i in range(k_reconstruct):
     zero = sampler.get_h_from_v(zero, rbm.W, rbm.hbias)

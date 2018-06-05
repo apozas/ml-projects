@@ -6,7 +6,7 @@ Implementation of different generative models based on energy-based learning. Ex
 with the MNIST dataset.
 
 Libraries required:
-- [pytorch](http://www.pytorch.org) as ML framework
+- [pytorch](http://www.pytorch.org) >= 0.4.0 as ML framework
 - [numpy](http://www.numpy.org/) for math operations
 - [matplotlib](https://matplotlib.org/) for image visualization
 - [tqdm](https://pypi.python.org/pypi/tqdm) for custom progress bar
