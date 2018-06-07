@@ -13,19 +13,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import torch
-import torch.nn.functional as F
+from optimizers import Adam
 from samplers import PersistentContrastiveDivergence
 from RBM import RBM
 from torchvision import datasets
-from tqdm import tqdm
 
 #------------------------------------------------------------------------------
 # Parameter choices
 #------------------------------------------------------------------------------
 hidd           = 30            # Number of nodes in the hidden layer
 learning_rate  = 1e-3          # Learning rate
-weight_decay   = 1e-4          # Weight decay
-momentum       = 0.95          # Momentum
 epochs         = 40            # Training epochs
 k              = 10            # Steps of Contrastive Divergence 
 k_reconstruct  = 2000          # Steps of iteration during generation
@@ -65,9 +62,11 @@ vbias = torch.log(data.mean(0)/(1 - data.mean(0))).clamp(-20, 20)
 sampler = PersistentContrastiveDivergence(k=k,
                                           hidden_activations=True,
                                           continuous_output=True)
+optimizer = Adam(learning_rate)
 rbm = RBM(n_visible=vis,
           n_hidden=hidd,
           sampler=sampler,
+          optimizer=optimizer,
           device=device,
           vbias=vbias,
           verbose=verbose)
@@ -80,12 +79,11 @@ if pre_trained:
 # -----------------------------------------------------------------------------
 if not pre_trained:
     validation = data[:10000]
-    for epoch in range(epochs):
+    for _ in range(epochs):
         train_loader = torch.utils.data.DataLoader(data,
                                                    batch_size=batch_size,
                                                    shuffle=True)
-        rbm.train(train_loader, learning_rate,
-                  weight_decay, momentum, epoch + 1)
+        rbm.train(train_loader)
         # A good measure of well-fitting is the free energy difference
         # between some known and unknown instances. It is related to the
         # log-likelihood difference, but it does not depend on the

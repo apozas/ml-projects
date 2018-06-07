@@ -62,6 +62,25 @@ class Sampler(object):
             :returns: torch.Tensor -- a sample configuration of the
                       visible nodes
         """
+    
+    def get_negative_phase(self, v0, W, vbias, hbias):
+        """Returns the negative phase for both the visible and hidden nodes
+        
+        Arguments:
+        
+            :param v0: Initial configuration of the visible nodes
+            :type v0: torch.Tensor
+            :param W: Weights connecting the visible and hidden layers
+            :type W: torch.nn.Parameter
+            :param vbias: Biases for the visible nodes
+            :type vbias: torch.nn.Parameter
+            :param hbias: Biases for the hidden nodes
+            :type hbias: torch.nn.Parameter
+            
+            :returns: torch.Tensor -- a sample configuration of the
+                      visible nodes
+        """
+    
 
 class ContrastiveDivergence(Sampler):
 
@@ -97,25 +116,6 @@ class ContrastiveDivergence(Sampler):
         self.continuous_output = continuous_output
 
     def get_v_sample(self, v0, W, vbias, hbias):
-        """Obtains a sample of the visible layer after k steps of Contrastive
-        Divergence. The method reads
-        
-        get h0 from p(h|v0) -> get v1 from p(v|h0) -> get h1 from p(h|v1) ...
-        
-        Arguments:
-        
-            :param v0: Initial configuration of the visible nodes
-            :type v0: torch.Tensor
-            :param W: Weights connecting the visible and hidden layers
-            :type W: torch.nn.Parameter
-            :param vbias: Biases for the visible nodes
-            :type vbias: torch.nn.Parameter
-            :param hbias: Biases for the hidden nodes
-            :type hbias: torch.nn.Parameter
-            
-            :returns: torch.Tensor -- a sample configuration of the
-                      visible nodes
-        """
         v = None
         pre_internal_sampling = self.internal_sampling
         self.internal_sampling = True
@@ -129,20 +129,6 @@ class ContrastiveDivergence(Sampler):
         return v
 
     def get_h_from_v(self, v, W, hbias):
-        """Samples the hidden layer from the conditional distribution p(h|v)
-        
-        Arguments:
-        
-            :param v0: Initial configuration of the visible nodes
-            :type v0: torch.Tensor
-            :param W: Weights connecting the visible and hidden layers
-            :type W: torch.nn.Parameter
-            :param hbias: Biases for the hidden nodes
-            :type hbias: torch.nn.Parameter
-            
-            :returns: torch.Tensor -- a sample configuration of the
-                      hidden nodes
-        """
         h_probs = self._propup(v, W, hbias)
         h_sample = h_probs.bernoulli()
         return (h_probs if (self.hidden_activations
@@ -150,23 +136,14 @@ class ContrastiveDivergence(Sampler):
                 else h_sample)
 
     def get_v_from_h(self, h, W, vbias):
-        """Samples the visible layer from the conditional distribution p(v|h)
-        
-        Arguments:
-        
-            :param h: Initial configuration of the hidden nodes
-            :type h: torch.nn.Parameter
-            :param W: Weights connecting the visible and hidden layers
-            :type W: torch.nn.Parameter
-            :param vbias: Biases for the visible nodes
-            :type vbias: torch.nn.Parameter
-            
-            :returns: torch.Tensor -- a sample configuration of the
-                      visible nodes
-        """
         v_probs = self._propdown(h, W, vbias)
         v_sample = v_probs.bernoulli()
         return v_probs if self.continuous_output else v_sample
+
+    def get_negative_phase(self, v0, W, vbias, hbias):
+        vneg = self.get_v_sample(v0, W, vbias, hbias)
+        hneg = self.get_h_from_v(vneg, W, hbias)
+        return vneg, hneg
 
     def _propdown(self, h, W, vbias):
         pre_sigmoid_activation = F.linear(F.dropout(h, self.dropout),
@@ -204,23 +181,6 @@ class PersistentContrastiveDivergence(ContrastiveDivergence):
         self.first_call = True
         
     def get_v_sample(self, v0, W, vbias, hbias):
-        """Obtains a sample of the visible layer after k steps of Persistent
-        Contrastive Divergence.
-        
-        Arguments:
-        
-            :param v0: Unused parameter, needed for consistency
-            :type v0: None
-            :param W: Weights connecting the visible and hidden layers
-            :type W: torch.nn.Parameter
-            :param vbias: Biases for the visible nodes
-            :type vbias: torch.nn.Parameter
-            :param hbias: Biases for the hidden nodes
-            :type hbias: torch.nn.Parameter
-            
-            :returns: torch.Tensor -- a sample configuration of the
-                      visible nodes
-        """
         if self.first_call:
             self.markov_chains = rand(v0.size()).to(v0.device)
             self.first_call = False

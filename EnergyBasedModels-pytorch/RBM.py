@@ -47,7 +47,7 @@ def log1pexp(tensor):
 
 class RBM(Module):
 
-    def __init__(self, n_visible=100, n_hidden=50, sampler=None,
+    def __init__(self, n_visible=100, n_hidden=50, sampler=None, optimizer=None,
                  device=None, verbose=0, W=None, hbias=None, vbias=None):
         '''Constructor for the class.
 
@@ -59,6 +59,8 @@ class RBM(Module):
             :type n_hidden: int
             :param sampler: Method used to draw samples from the model
             :type sampler: :class:`samplers`
+            :param optimizer: Optimizer used for parameter updates
+            :type optimizer: :class:`optimizers`
             :param device: Device where to perform computations. None is CPU.
             :type device: torch.device
             :param verbose: Optional parameter to set verbosity mode
@@ -87,7 +89,6 @@ class RBM(Module):
             self.W = Parameter(torch.Tensor(
                                         0.01 * torch.randn(n_hidden, n_visible)
                                             )).to(self.device)
-        self.W_update = self.W.clone()
 
         if hbias is not None:
             self.hbias = Parameter(hbias).to(self.device)
@@ -95,7 +96,6 @@ class RBM(Module):
             self.hbias = Parameter(torch.Tensor(
                                                 torch.zeros(n_hidden)
                                                 )).to(self.device)
-        self.hbias_update = self.hbias.clone()
 
         if vbias is not None:
             self.vbias = Parameter(vbias).to(self.device)
@@ -103,7 +103,10 @@ class RBM(Module):
             self.vbias = Parameter(torch.Tensor(
                                                 torch.zeros(n_visible)
                                                 )).to(self.device)
-        self.vbias_update = self.vbias.clone()
+
+        if optimizer is None:
+            raise Exception('You must provide an appropriate optimizer')
+        self.optimizer = optimizer
 
         if sampler is None:
             raise Exception('You must provide an appropriate sampler')
@@ -124,7 +127,7 @@ class RBM(Module):
         hidden_term = log1pexp(wx_b).sum(1)
         return (-hidden_term - vbias_term)
 
-    def train(self, input_data, lr, weight_decay, momentum, epoch=0):
+    def train(self, input_data):
         '''Trains the RBM.
 
         Arguments:
@@ -141,42 +144,29 @@ class RBM(Module):
             :type epoch: int
         '''
         error_ = []
-        for batch in tqdm(input_data, desc='Epoch ' + str(epoch)):
+        for batch in tqdm(input_data, desc=('Epoch ' +
+                                            str(self.optimizer.epoch + 1))):
             sample_data = batch.float()
             # Sampling from the model to compute updates
             # Get positive phase from the data
             vpos = sample_data
             hpos = self.sampler.get_h_from_v(vpos, self.W, self.hbias)
             # Get negative phase from the chains
-            vneg = self.sampler.get_v_sample(vpos, self.W, self.vbias, self.hbias)
-            hneg = self.sampler.get_h_from_v(vneg, self.W, self.hbias)
+            vneg, hneg = self.sampler.get_negative_phase(vpos, self.W,
+                                                        self.vbias, self.hbias)
 
             # Weight updates. Includes momentum and weight decay
-            self.W_update     *= momentum
-            self.hbias_update *= momentum
-            self.vbias_update *= momentum
+            W_update, vbias_update, hbias_update = \
+                             self.optimizer.get_updates(vpos, vneg, hpos, hneg,
+                                                self.W, self.vbias, self.hbias)
 
-            # Weight decay is only applied to W, because they are the maximum
-            # responsibles for overfitting
-            # Note that we multiply by the learning rate, so the function
-            # optimized is (NLL - weight_decay * W)
-            self.W_update -= lr * weight_decay * self.W
+            self.W.data     += W_update.data
+            self.hbias.data += hbias_update.data
+            self.vbias.data += vbias_update.data
 
-            deltaW = (outer_product(hpos, vpos)
-                      - outer_product(hneg, vneg)).mean(0)
-            deltah = (hpos - hneg).mean(0)
-            deltav = (vpos - vneg).mean(0)
-
-            self.W_update.data     += lr * deltaW
-            self.hbias_update.data += lr * deltah
-            self.vbias_update.data += lr * deltav
-
-            self.W.data     += self.W_update.data
-            self.hbias.data += self.hbias_update.data
-            self.vbias.data += self.vbias_update.data
-
-            rec_error = F.mse_loss(vneg, vpos)
-            error_.append(rec_error.item())
+        self.optimizer.epoch += 1
 
         if self.verbose > 0:
+            rec_error = F.mse_loss(vneg, vpos)
+            error_.append(rec_error.item())
             print('Reconstruction error = ' + str(np.mean(error_)))
