@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import os
 import torch
 from DBN import DBN
+from optimizers import SGD
 from samplers import PersistentContrastiveDivergence
 from torchvision import datasets
 
@@ -57,12 +58,16 @@ vis  = len(data[0])
 pre_trained = os.path.isfile('DBN.h5')
 
 sampler = PersistentContrastiveDivergence(k=k, hidden_activations=True)
-dbn     = DBN(n_visible=vis,
-              hidden_layer_sizes=hidden_layers,
-              sample_copies=sample_copies,
-              sampler=sampler,
-              continuous_output=continuous_out,
-              device=device)
+optimizer = SGD(learning_rate=pretrain_lr,
+                momentum=momentum,
+                weight_decay=weight_decay)
+dbn = DBN(n_visible=vis,
+          hidden_layer_sizes=hidden_layers,
+          sample_copies=sample_copies,
+          sampler=sampler,
+          optimizer=optimizer,
+          continuous_output=continuous_out,
+          device=device)
 if pre_trained:
     dbn.load_model('DBN.h5')
 # -----------------------------------------------------------------------------
@@ -70,9 +75,6 @@ if pre_trained:
 # -----------------------------------------------------------------------------
 if not pre_trained:
     dbn.pretrain(input_data=data,
-                 lr=pretrain_lr,
-                 weight_decay=weight_decay,
-                 momentum=momentum,
                  epochs=pretrain_epochs,
                  batch_size=batch_size,
                  test=test)

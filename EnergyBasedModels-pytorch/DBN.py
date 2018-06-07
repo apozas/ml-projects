@@ -18,8 +18,8 @@ from tqdm import tqdm
 
 class DBN(object):
     def __init__(self, n_visible=6, hidden_layer_sizes=[3, 3],
-                 sample_copies=1, sampler=None, continuous_output=False,
-                 verbose=0, device=None):
+                 sample_copies=1, sampler=None, optimizer=None,
+                 continuous_output=False, verbose=0, device=None):
         '''Constructor for the class.
         
         Arguments:
@@ -34,6 +34,8 @@ class DBN(object):
             :type sample_copies: int
             :param sampler: Method used to draw samples from the model
             :type sampler: :class:`samplers`
+            :param optimizer: Optimizer used for parameter updates
+            :type optimizer: :class:`optimizers`
             :param continuous_output: Optional parameter to indicate whether
                                       the visible layer is continuous-valued.
             :type continuous_output: bool
@@ -55,7 +57,11 @@ class DBN(object):
         if device is None:
             device = torch.device('cpu')
         self.device = device
-        
+
+        if optimizer is None:
+            raise Exception('You must provide an appropriate optimizer')
+        self.optimizer = optimizer
+
         if sampler is None:
             raise Exception('You must provide an appropriate sampler')
         self.sampler = sampler
@@ -70,18 +76,19 @@ class DBN(object):
             gen_layer = RBM(n_visible=input_size,
                             n_hidden=hidden_layer_sizes[i],
                             sampler=sampler,
+                            optimizer=optimizer,
                             verbose=verbose,
                             device=device)
             inf_layer = RBM(n_visible=input_size,
                             n_hidden=hidden_layer_sizes[i],
                             sampler=sampler,
+                            optimizer=optimizer,
                             verbose=verbose,
                             device=device)
             self.gen_layers.append(gen_layer)
             self.inference_layers.append(inf_layer)
             
-    def pretrain(self, input_data, lr=0.1, weight_decay=0, momentum=0,
-                 epochs=15, batch_size=10, test=None):
+    def pretrain(self, input_data, epochs=15, batch_size=10, test=None):
         '''Pre-trains the DBN as a sequence of RBMs.
         
         Arguments:
@@ -125,12 +132,13 @@ class DBN(object):
                                                     self.gen_layers[i-1].hbias)
             
             self.sampler.first_call = True
+            self.optimizer.first_call = True
             rbm = self.inference_layers[i]
             for epoch in range(epochs):
                 layer_loader = torch.utils.data.DataLoader(layer_input,
                                                            batch_size,
                                                            True)
-                rbm.train(layer_loader, lr, weight_decay, momentum, epoch + 1)
+                rbm.train(layer_loader)
                 if test is not None:
                     validation = layer_input[:test.size(0)]
                     val_fe  = rbm.free_energy(validation).mean(0)
