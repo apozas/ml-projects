@@ -84,25 +84,25 @@ class RBM(Module):
             self.device = torch.device('cpu')
         
         if W is not None:
-            self.W = Parameter(W).to(self.device)
+            self.W = Parameter(W.to(self.device))
         else:
             self.W = Parameter(torch.Tensor(
                                         0.01 * torch.randn(n_hidden, n_visible)
-                                            )).to(self.device)
+                                            ).to(self.device))
 
         if hbias is not None:
-            self.hbias = Parameter(hbias).to(self.device)
+            self.hbias = Parameter(hbias.to(self.device))
         else:
             self.hbias = Parameter(torch.Tensor(
                                                 torch.zeros(n_hidden)
-                                                )).to(self.device)
+                                                ).to(self.device))
 
         if vbias is not None:
-            self.vbias = Parameter(vbias).to(self.device)
+            self.vbias = Parameter(vbias.to(self.device))
         else:
             self.vbias = Parameter(torch.Tensor(
                                                 torch.zeros(n_visible)
-                                                )).to(self.device)
+                                                ).to(self.device))
 
         if optimizer is None:
             raise Exception('You must provide an appropriate optimizer')
