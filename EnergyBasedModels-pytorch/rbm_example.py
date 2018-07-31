@@ -35,7 +35,7 @@ verbose        = 1             # Additional information printout
 # Data preparation
 #------------------------------------------------------------------------------
 
-device = torch.device('cuda' if gpu else 'cpu')
+device = torch.device('cuda' if (gpu and torch.cuda.is_available()) else 'cpu')
 
 data = datasets.MNIST('mnist',
                       train=True,

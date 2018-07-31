@@ -27,24 +27,6 @@ def outer_product(vecs1, vecs2):
     return torch.bmm(vecs1.unsqueeze(2), vecs2.unsqueeze(1))
 
 
-def log1pexp(tensor):
-    '''Computes pointwise log(1+exp()) for all elements in a torch tensor. The
-    way of computing it without under- or overflows is through the
-    log-sum-exp trick, namely computing
-    log(1+exp(x)) = a + log(exp(-a) + exp(x-a))     with a = max(0, x)
-    The function is adapted to be used in GPU if needed.
-
-    Arguments:
-        :param tensor: torch.Tensor
-        :returns: torch.Tensor
-       '''
-    zr = torch.zeros(tensor.size())
-    if tensor.is_cuda:
-        zr = zr.cuda()
-    a = torch.max(zr, tensor)
-    return a + (a.neg().exp() + (tensor - a).exp()).log()
-
-
 class RBM(Module):
 
     def __init__(self, n_visible=100, n_hidden=50, sampler=None, optimizer=None,
@@ -124,7 +106,7 @@ class RBM(Module):
         '''
         vbias_term = v.mv(self.vbias)
         wx_b = F.linear(v, self.W, self.hbias)
-        hidden_term = log1pexp(wx_b).sum(1)
+        hidden_term = F.softplus(wx_b).sum(1)
         return (-hidden_term - vbias_term)
 
     def train(self, input_data):
