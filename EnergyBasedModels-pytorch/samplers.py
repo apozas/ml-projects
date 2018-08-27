@@ -4,8 +4,8 @@
 # Requires: pytorch as ML framework
 # Last modified: Jun, 2018
 
-from torch import rand
-import torch.nn.functional as F
+from torch import rand, sigmoid
+from torch.nn.functional import linear, dropout
 
 class Sampler(object):
 
@@ -15,9 +15,9 @@ class Sampler(object):
 
     def get_v_sample(self, v0, W, vbias, hbias):
         """Samples the visible layer from p(v)=sum_h p(v,h)
-        
+
         Arguments:
-        
+
             :param v0: Initial configuration of the visible nodes
             :type v0: torch.Tensor
             :param W: Weights connecting the visible and hidden layers
@@ -26,48 +26,48 @@ class Sampler(object):
             :type vbias: torch.nn.Parameter
             :param hbias: Biases for the hidden nodes
             :type hbias: torch.nn.Parameter
-            
+
             :returns: torch.Tensor -- a sample configuration of the
                       visible nodes
         """
 
     def get_h_from_v(self, v0, W, hbias):
         """Samples the hidden layer from the conditional distribution p(h|v)
-        
+
         Arguments:
-        
+
             :param v0: Initial configuration of the visible nodes
             :type v0: torch.Tensor
             :param W: Weights connecting the visible and hidden layers
             :type W: torch.nn.Parameter
             :param hbias: Biases for the hidden nodes
             :type hbias: torch.nn.Parameter
-            
+
             :returns: torch.Tensor -- a sample configuration of the
                       hidden nodes
         """
 
     def get_v_from_h(self, h0, W, vbias):
         """Samples the visible layer from the conditional distribution p(v|h)
-        
+
         Arguments:
-        
+
             :param h0: Initial configuration of the hidden nodes
             :type h0: torch.Tensor
             :param W: Weights connecting the visible and hidden layers
             :type W: torch.nn.Parameter
             :param vbias: Biases for the visible nodes
             :type vbias: torch.nn.Parameter
-            
+
             :returns: torch.Tensor -- a sample configuration of the
                       visible nodes
         """
-    
+
     def get_negative_phase(self, v0, W, vbias, hbias):
         """Returns the negative phase for both the visible and hidden nodes
-        
+
         Arguments:
-        
+
             :param v0: Initial configuration of the visible nodes
             :type v0: torch.Tensor
             :param W: Weights connecting the visible and hidden layers
@@ -76,20 +76,20 @@ class Sampler(object):
             :type vbias: torch.nn.Parameter
             :param hbias: Biases for the hidden nodes
             :type hbias: torch.nn.Parameter
-            
+
             :returns: torch.Tensor -- a sample configuration of the
                       visible nodes
         """
-    
+
 
 class ContrastiveDivergence(Sampler):
 
     def __init__(self, k, dropout=0, hidden_activations=False,
                  continuous_output=False):
         """Constructor for the class.
-        
+
         Arguments:
-        
+
             :param k: The number of iterations in CD-k
             :type k: int
             :param dropout: Optional parameter, fraction of neurons in the
@@ -146,22 +146,22 @@ class ContrastiveDivergence(Sampler):
         return vneg, hneg
 
     def _propdown(self, h, W, vbias):
-        pre_sigmoid_activation = F.linear(F.dropout(h, self.dropout),
+        pre_sigmoid_activation = linear(dropout(h, self.dropout),
                                           W.t(), vbias)
-        return F.sigmoid(pre_sigmoid_activation) 
+        return sigmoid(pre_sigmoid_activation)
 
     def _propup(self, v, W, hbias):
-        pre_sigmoid_activation = F.linear(F.dropout(v, self.dropout), W, hbias)
-        return F.sigmoid(pre_sigmoid_activation)
+        pre_sigmoid_activation = linear(dropout(v, self.dropout), W, hbias)
+        return sigmoid(pre_sigmoid_activation)
 
 class PersistentContrastiveDivergence(ContrastiveDivergence):
 
-    def __init__(self, k, dropout=0, hidden_activations=False,
+    def __init__(self, k, n_chains=0, dropout=0, hidden_activations=False,
                  continuous_output=False):
         """Constructor for the class.
-        
+
         Arguments:
-        
+
             :param k: The number of iterations in PCD-k
             :type k: int
             :param dropout: Optional parameter, fraction of neurons in the
@@ -179,10 +179,15 @@ class PersistentContrastiveDivergence(ContrastiveDivergence):
         """
         super().__init__(k, dropout, hidden_activations, continuous_output)
         self.first_call = True
-        
+        self.n_chains = n_chains
+
     def get_v_sample(self, v0, W, vbias, hbias):
         if self.first_call:
-            self.markov_chains = rand(v0.size()).to(v0.device)
+            if self.n_chains <= 0:
+                self.markov_chains = rand(v0.size()).to(v0.device)
+            else:
+                self.markov_chains = rand((self.n_chains,) + v0.size()[1:]
+                                          ).to(v0.device)
             self.first_call = False
         pre_internal_sampling = self.internal_sampling
         self.internal_sampling = True
