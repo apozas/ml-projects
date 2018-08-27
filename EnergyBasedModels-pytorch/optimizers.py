@@ -15,9 +15,9 @@ class Optimizer(object):
 
     def get_updates(self, vpos, vneg, hpos, hneg, W, vbias, hbias):
         """Obtains the parameter updates for weights and biases
-        
+
         Arguments:
-        
+
             :param vpos: Positive phase of the visible nodes
             :type vpos: torch.Tensor
             :param vneg: Negative phase of the visible nodes
@@ -32,7 +32,7 @@ class Optimizer(object):
             :type vbias: torch.nn.Parameter
             :param hbias: Biases for the hidden nodes
             :type hbias: torch.nn.Parameter
-            
+
             :returns: :W_update: torch.Tensor -- update for the RBM weights
                       :vbias_update:  torch.Tensor -- update for the RBM
                                       visible biases
@@ -41,10 +41,10 @@ class Optimizer(object):
         """
 
 class SGD(Optimizer):
-    
+
     def __init__(self, learning_rate, momentum=0, weight_decay=0):
         """Constructor for the class.
-        
+
         Arguments:
 
             :param learning_rate: Learning rate
@@ -86,10 +86,10 @@ class SGD(Optimizer):
         # optimized is (NLL - weight_decay * W)
         self.W_update -= self.learning_rate * self.weight_decay * W
 
-        deltaW = (outer_product(hpos, vpos)
-                  - outer_product(hneg, vneg)).mean(0)
-        deltah = (hpos - hneg).mean(0)
-        deltav = (vpos - vneg).mean(0)
+        deltaW = (outer_product(hpos, vpos).mean(0)
+                  - outer_product(hneg, vneg).mean(0))
+        deltah = hpos.mean(0) - hneg.mean(0)
+        deltav = vpos.mean(0) - vneg.mean(0)
 
         self.W_update.data     += self.learning_rate * deltaW
         self.vbias_update.data += self.learning_rate * deltav
@@ -98,10 +98,10 @@ class SGD(Optimizer):
         return self.W_update, self.vbias_update, self.hbias_update
 
 class Adam(Optimizer):
-    
+
     def __init__(self, learning_rate, beta1=0.9, beta2=0.999, eps=1e-8):
         """Constructor for the class.
-        
+
         Arguments:
 
             :param learning_rate: Learning rate
@@ -122,7 +122,7 @@ class Adam(Optimizer):
         self.eps   = eps
         self.first_call = True
         self.epoch = 0
-        
+
     def get_updates(self, vpos, vneg, hpos, hneg, W, vbias, hbias):
         if self.first_call:
             self.m_W = torch.zeros(W.size()).to(W.device)
@@ -132,11 +132,11 @@ class Adam(Optimizer):
             self.v_v = torch.zeros(vbias.size()).to(vbias.device)
             self.v_h = torch.zeros(hbias.size()).to(hbias.device)
             self.first_call = False
-        
-        deltaW = (outer_product(hpos, vpos)
-                  - outer_product(hneg, vneg)).data.mean(0)
-        deltah = (hpos - hneg).data.mean(0)
-        deltav = (vpos - vneg).data.mean(0)
+
+        deltaW = (outer_product(hpos, vpos).mean(0)
+                  - outer_product(hneg, vneg).mean(0))
+        deltah = hpos.mean(0) - hneg.mean(0)
+        deltav = vpos.mean(0) - vneg.mean(0)
 
         self.m_W *= self.beta1
         self.m_W += (1 - self.beta1) * deltaW
