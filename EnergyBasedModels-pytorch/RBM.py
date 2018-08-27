@@ -30,7 +30,7 @@ def outer_product(vecs1, vecs2):
 class RBM(Module):
 
     def __init__(self, n_visible=100, n_hidden=50, sampler=None, optimizer=None,
-                 device=None, verbose=0, W=None, hbias=None, vbias=None):
+                 device=None, W=None, hbias=None, vbias=None):
         '''Constructor for the class.
 
         Arguments:
@@ -64,7 +64,7 @@ class RBM(Module):
             self.device = device
         else:
             self.device = torch.device('cpu')
-        
+
         if W is not None:
             self.W = Parameter(W.to(self.device))
         else:
@@ -147,8 +147,3 @@ class RBM(Module):
             self.vbias.data += vbias_update.data
 
         self.optimizer.epoch += 1
-
-        if self.verbose > 0:
-            rec_error = F.mse_loss(vneg, vpos)
-            error_.append(rec_error.item())
-            print('Reconstruction error = ' + str(np.mean(error_)))
