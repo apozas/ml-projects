@@ -2,7 +2,7 @@
 #
 # Author: Alejandro Pozas-Kerstjens
 # Requires: pytorch as ML framework
-# Last modified: Jun, 2018
+# Last modified: Aug, 2018
 
 import torch
 from RBM import outer_product
@@ -71,9 +71,9 @@ class SGD(Optimizer):
 
     def get_updates(self, vpos, vneg, hpos, hneg, W, vbias, hbias):
         if self.first_call:
-            self.W_update = torch.zeros(W.size()).to(W.device)
-            self.vbias_update = torch.zeros(vbias.size()).to(vbias.device)
-            self.hbias_update = torch.zeros(hbias.size()).to(hbias.device)
+            self.W_update = torch.zeros_like(W)
+            self.vbias_update = torch.zeros_like(vbias)
+            self.hbias_update = torch.zeros_like(hbias)
             self.first_call = False
 
         self.W_update     *= self.momentum
@@ -125,12 +125,12 @@ class Adam(Optimizer):
 
     def get_updates(self, vpos, vneg, hpos, hneg, W, vbias, hbias):
         if self.first_call:
-            self.m_W = torch.zeros(W.size()).to(W.device)
-            self.m_v = torch.zeros(vbias.size()).to(vbias.device)
-            self.m_h = torch.zeros(hbias.size()).to(hbias.device)
-            self.v_W = torch.zeros(W.size()).to(W.device)
-            self.v_v = torch.zeros(vbias.size()).to(vbias.device)
-            self.v_h = torch.zeros(hbias.size()).to(hbias.device)
+            self.m_W = torch.zeros_like(W)
+            self.m_v = torch.zeros_like(vbias)
+            self.m_h = torch.zeros_like(hbias)
+            self.v_W = torch.zeros_like(W)
+            self.v_v = torch.zeros_like(vbias)
+            self.v_h = torch.zeros_like(hbias)
             self.first_call = False
 
         deltaW = (outer_product(hpos, vpos).mean(0)
